@@ -18,8 +18,9 @@
 #ifndef NN_H
 #define NN_H
 
-#define NN_ITERATIONS 10000
-#define NN_RATE 0.5
+#define NN_ITERATIONS 1000000
+#define NN_E 2.7182818284590452354
+#define NN_RATE 1
 #define NN_MOMENTUM 0.1
 
 struct nn {
@@ -40,14 +41,18 @@ struct nn {
   /* Last changes */
   double **ch;
   double **co;
+
+  /* Deltas */
+  double *hd; /* Hidden deltas */
+  double *od; /* Output deltas */
 };
 
 double *nn_act_alloc(int);
-void nn_act_free(double *);
 double **nn_weight_alloc(int, int);
-void nn_weight_free(double **, int);
-void nn_init(struct nn *, int, int, int);
-void nn_free(struct nn *);
+void nn_freep(void *);
+int nn_init(struct nn *, int, int, int);
+int nn_del(struct nn *);
+double nn_sigmoid(double);
 void nn_update(struct nn *, int *);
 void nn_back_propagate(struct nn *, int *);
 void nn_train(struct nn *nn, int, int [][nn->ni], int [][nn->no]);

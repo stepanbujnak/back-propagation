@@ -27,6 +27,10 @@ nn_act_alloc(int n) {
   double *act;
 
   act = (double *)malloc(sizeof(double) * n);
+  if (!act) {
+    return NULL;
+  }
+
   for (int i = 0; i < n; i++) {
     act[i] = 1.0;
   }
@@ -34,20 +38,26 @@ nn_act_alloc(int n) {
   return act;
 }
 
-void
-nn_act_free(double *act) {
-  free(act);
-}
-
 double **
 nn_weight_alloc(int n, int m) {
   double **weight;
+  double *heap;
 
-  srand(time(NULL));
-
+  /* Allocate continuously */
   weight = (double **)malloc(sizeof(double *) * n);
-  for (int i = 0; i < n; i++) {
-    weight[i] = (double *)malloc(sizeof(double) * m);
+  if (!weight) {
+    return NULL;
+  }
+
+  heap = (double *)malloc(sizeof(double) * n * m);
+  if (!heap) {
+    nn_freep(&weight);
+    return NULL;
+  }
+
+  /* Fill with random numbers */
+  for(int i = 0; i < n; i++) {
+    weight[i] = heap + i * n;
     for (int j = 0; j < m; j++) {
       weight[i][j] = ((float)rand() / (float)(RAND_MAX / 2.0)) - 1.0;
     }
@@ -57,41 +67,113 @@ nn_weight_alloc(int n, int m) {
 }
 
 void
-nn_weight_free(double **w, int n) {
-  for (int i = 0; i < n; i++) {
-    free(w[i]);
+nn_freep(void *arg) {
+  void **ptr = (void **)arg;
+  if (*ptr) {
+    free(*ptr);
+    *ptr = NULL;
   }
-  free(w);
 }
 
-void
+int
 nn_init(struct nn *nn, int ni, int nh, int no) {
   nn->ni = ni;
   nn->nh = nh;
   nn->no = no;
 
+  /* Assign NULL so that nn_freep won't fail */
+  nn->ai = NULL;
+  nn->ah = NULL;
+  nn->ao = NULL;
+  nn->wh = NULL;
+  nn->wo = NULL;
+  nn->ch = NULL;
+  nn->co = NULL;
+  nn->hd = NULL;
+  nn->od = NULL;
+
   nn->ai = nn_act_alloc(ni);
+  if (!nn->ai) {
+    return nn_del(nn);
+  }
+
   nn->ah = nn_act_alloc(nh);
+  if (!nn->ah) {
+    return nn_del(nn);
+  }
+
   nn->ao = nn_act_alloc(no);
+  if (!nn->ao) {
+    return nn_del(nn);
+  }
+
+  nn->hd = nn_act_alloc(nh);
+  if (!nn->hd) {
+    return nn_del(nn);
+  }
+
+  nn->od = nn_act_alloc(no);
+  if (!nn->od) {
+    return nn_del(nn);
+  }
 
   nn->wh = nn_weight_alloc(ni, nh);
+  if (!nn->wh) {
+    return nn_del(nn);
+  }
+
   nn->wo = nn_weight_alloc(nh, no);
+  if (!nn->wo) {
+    return nn_del(nn);
+  }
 
   nn->ch = nn_weight_alloc(ni, nh);
+  if (!nn->ch) {
+    return nn_del(nn);
+  }
+
   nn->co = nn_weight_alloc(nh, no);
+  if (!nn->co) {
+    return nn_del(nn);
+  }
+
+  return 0;
 }
 
-void
-nn_free(struct nn *nn) {
-  nn_act_free(nn->ai);
-  nn_act_free(nn->ah);
-  nn_act_free(nn->ao);
+int
+nn_del(struct nn *nn) {
+  nn_freep(&nn->ai);
+  nn_freep(&nn->ah);
+  nn_freep(&nn->ao);
+  nn_freep(&nn->hd);
+  nn_freep(&nn->od);
 
-  nn_weight_free(nn->wh, nn->ni);
-  nn_weight_free(nn->wo, nn->nh);
+  if (nn->wh) {
+    nn_freep(&nn->wh[0]);
+    nn_freep(&nn->wh);
+  }
 
-  nn_weight_free(nn->ch, nn->ni);
-  nn_weight_free(nn->co, nn->nh);
+  if (nn->wo) {
+    nn_freep(&nn->wo[0]);
+    nn_freep(&nn->wo);
+  }
+
+  if (nn->ch) {
+    nn_freep(&nn->ch[0]);
+    nn_freep(&nn->ch);
+  }
+
+  if (nn->co) {
+    nn_freep(&nn->co[0]);
+    nn_freep(&nn->co);
+  }
+
+  return 1;
+}
+
+double
+nn_sigmoid(double x) {
+  return 1.0 / (1.0 + pow(NN_E, -x));
 }
 
 void
@@ -107,7 +189,7 @@ nn_update(struct nn *nn, int *inputs) {
       sum += nn->ai[j] * nn->wh[j][i];
     }
 
-    nn->ah[i] = tanh(sum);
+    nn->ah[i] = nn_sigmoid(sum);
   }
 
   for (int i = 0; i < nn->no; i++) {
@@ -117,33 +199,29 @@ nn_update(struct nn *nn, int *inputs) {
       sum += nn->ah[j] * nn->wo[j][i];
     }
 
-    nn->ao[i] = tanh(sum);
+    nn->ao[i] = nn_sigmoid(sum);
   }
 }
 
 void
 nn_back_propagate(struct nn *nn, int *targets) {
-  double *ods, *hds;
-
   /* Output deltas */
-  ods = (double *)malloc(sizeof(double) * nn->no);
   for (int i = 0; i < nn->no; i++) {
     double error;
 
     error = targets[i] - nn->ao[i];
-    ods[i] = nn->ao[i] * (1 - nn->ao[i]) * error;
+    nn->od[i] = nn->ao[i] * (1 - nn->ao[i]) * error;
   }
 
   /* Hidden deltas */
-  hds = (double *)malloc(sizeof(double) * nn->nh);
   for (int i = 0; i < nn->nh; i++) {
     double error = 0.0;
 
     for (int j = 0; j < nn->no; j++) {
-      error += ods[j] * nn->wo[i][j];
+      error += nn->od[j] * nn->wo[i][j];
     }
 
-    hds[i] = nn->ah[i] * (1 - nn->ah[i]) * error;
+    nn->hd[i] = nn->ah[i] * (1 - nn->ah[i]) * error;
   }
 
   /* Update output weights */
@@ -151,7 +229,7 @@ nn_back_propagate(struct nn *nn, int *targets) {
     for (int j = 0; j < nn->no; j++) {
       double change;
       
-      change = ods[j] * nn->ah[i];
+      change = nn->od[j] * nn->ah[i];
       nn->wo[i][j] += NN_RATE * change + NN_MOMENTUM * nn->co[i][j];
       nn->co[i][j] = change;
     }
@@ -162,15 +240,11 @@ nn_back_propagate(struct nn *nn, int *targets) {
     for (int j = 0; j < nn->nh; j++) {
       double change;
 
-      change = hds[j] * nn->ai[i];
+      change = nn->hd[j] * nn->ai[i];
       nn->wh[i][j] += NN_RATE * change + NN_MOMENTUM * nn->ch[i][j];
       nn->ch[i][j] = change;
     }
   }
-
-  /* Cleanup */
-  free(ods);
-  free(hds);
 }
 
 void
