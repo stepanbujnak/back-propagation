@@ -22,7 +22,16 @@
 
 #include "nn.h"
 
-double *
+static void
+nn_freep(void *arg) {
+  void **ptr = (void **)arg;
+  if (*ptr) {
+    free(*ptr);
+    *ptr = NULL;
+  }
+}
+
+static double *
 nn_act_alloc(int n) {
   double *act;
 
@@ -38,7 +47,7 @@ nn_act_alloc(int n) {
   return act;
 }
 
-double **
+static double **
 nn_weight_alloc(int n, int m) {
   double **weight;
   double *heap;
@@ -66,12 +75,79 @@ nn_weight_alloc(int n, int m) {
   return weight;
 }
 
-void
-nn_freep(void *arg) {
-  void **ptr = (void **)arg;
-  if (*ptr) {
-    free(*ptr);
-    *ptr = NULL;
+static double
+nn_sigmoid(double x) {
+  return 1.0 / (1.0 + pow(NN_E, -x));
+}
+
+static void
+nn_update(struct nn *nn, int *inputs) {
+  for (int i = 0; i < nn->ni; i++) {
+    nn->ai[i] = inputs[i];
+  }
+
+  for (int i = 0; i < nn->nh; i++) {
+    double sum = 0.0;
+
+    for (int j = 0; j < nn->ni; j++) {
+      sum += nn->ai[j] * nn->wh[j][i];
+    }
+
+    nn->ah[i] = nn_sigmoid(sum);
+  }
+
+  for (int i = 0; i < nn->no; i++) {
+    double sum = 0.0;
+
+    for (int j = 0; j < nn->nh; j++) {
+      sum += nn->ah[j] * nn->wo[j][i];
+    }
+
+    nn->ao[i] = nn_sigmoid(sum);
+  }
+}
+
+static void
+nn_back_propagate(struct nn *nn, int *targets) {
+  /* Output deltas */
+  for (int i = 0; i < nn->no; i++) {
+    double error;
+
+    error = targets[i] - nn->ao[i];
+    nn->od[i] = nn->ao[i] * (1 - nn->ao[i]) * error;
+  }
+
+  /* Hidden deltas */
+  for (int i = 0; i < nn->nh; i++) {
+    double error = 0.0;
+
+    for (int j = 0; j < nn->no; j++) {
+      error += nn->od[j] * nn->wo[i][j];
+    }
+
+    nn->hd[i] = nn->ah[i] * (1 - nn->ah[i]) * error;
+  }
+
+  /* Update output weights */
+  for (int i = 0; i < nn->nh; i++) {
+    for (int j = 0; j < nn->no; j++) {
+      double change;
+      
+      change = nn->od[j] * nn->ah[i];
+      nn->wo[i][j] += NN_RATE * change + NN_MOMENTUM * nn->co[i][j];
+      nn->co[i][j] = change;
+    }
+  }
+
+  /* Update hidden weights */
+  for (int i = 0; i < nn->ni; i++) {
+    for (int j = 0; j < nn->nh; j++) {
+      double change;
+
+      change = nn->hd[j] * nn->ai[i];
+      nn->wh[i][j] += NN_RATE * change + NN_MOMENTUM * nn->ch[i][j];
+      nn->ch[i][j] = change;
+    }
   }
 }
 
@@ -169,82 +245,6 @@ nn_del(struct nn *nn) {
   }
 
   return 1;
-}
-
-double
-nn_sigmoid(double x) {
-  return 1.0 / (1.0 + pow(NN_E, -x));
-}
-
-void
-nn_update(struct nn *nn, int *inputs) {
-  for (int i = 0; i < nn->ni; i++) {
-    nn->ai[i] = inputs[i];
-  }
-
-  for (int i = 0; i < nn->nh; i++) {
-    double sum = 0.0;
-
-    for (int j = 0; j < nn->ni; j++) {
-      sum += nn->ai[j] * nn->wh[j][i];
-    }
-
-    nn->ah[i] = nn_sigmoid(sum);
-  }
-
-  for (int i = 0; i < nn->no; i++) {
-    double sum = 0.0;
-
-    for (int j = 0; j < nn->nh; j++) {
-      sum += nn->ah[j] * nn->wo[j][i];
-    }
-
-    nn->ao[i] = nn_sigmoid(sum);
-  }
-}
-
-void
-nn_back_propagate(struct nn *nn, int *targets) {
-  /* Output deltas */
-  for (int i = 0; i < nn->no; i++) {
-    double error;
-
-    error = targets[i] - nn->ao[i];
-    nn->od[i] = nn->ao[i] * (1 - nn->ao[i]) * error;
-  }
-
-  /* Hidden deltas */
-  for (int i = 0; i < nn->nh; i++) {
-    double error = 0.0;
-
-    for (int j = 0; j < nn->no; j++) {
-      error += nn->od[j] * nn->wo[i][j];
-    }
-
-    nn->hd[i] = nn->ah[i] * (1 - nn->ah[i]) * error;
-  }
-
-  /* Update output weights */
-  for (int i = 0; i < nn->nh; i++) {
-    for (int j = 0; j < nn->no; j++) {
-      double change;
-      
-      change = nn->od[j] * nn->ah[i];
-      nn->wo[i][j] += NN_RATE * change + NN_MOMENTUM * nn->co[i][j];
-      nn->co[i][j] = change;
-    }
-  }
-
-  /* Update hidden weights */
-  for (int i = 0; i < nn->ni; i++) {
-    for (int j = 0; j < nn->nh; j++) {
-      double change;
-
-      change = nn->hd[j] * nn->ai[i];
-      nn->wh[i][j] += NN_RATE * change + NN_MOMENTUM * nn->ch[i][j];
-      nn->ch[i][j] = change;
-    }
-  }
 }
 
 void

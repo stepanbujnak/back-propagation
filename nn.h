@@ -47,14 +47,8 @@ struct nn {
   double *od; /* Output deltas */
 };
 
-double *nn_act_alloc(int);
-double **nn_weight_alloc(int, int);
-void nn_freep(void *);
 int nn_init(struct nn *, int, int, int);
 int nn_del(struct nn *);
-double nn_sigmoid(double);
-void nn_update(struct nn *, int *);
-void nn_back_propagate(struct nn *, int *);
 void nn_train(struct nn *nn, int, int [][nn->ni], int [][nn->no]);
 void nn_test(struct nn *nn, int, int [][nn->ni], int [][nn->no]);
 

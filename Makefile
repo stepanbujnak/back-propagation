@@ -1,5 +1,11 @@
+PROGRAM = nn
+LIBS    = -lm
+SOURCES = main.c nn.c
+FLAGS   = -Wall -std=c99
+CC      = gcc
+
 all:
-	gcc -Wall -std=c99 main.c nn.c -lm -o nn
+	${CC} ${FLAGS} ${SOURCES} ${LIBS} -o ${PROGRAM}
 
 clean:
-	rm -f nn
+	rm -f ${PROGRAM}
