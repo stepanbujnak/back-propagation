@@ -23,24 +23,20 @@ int
 main(int argc, char *argv[]) {
   struct nn nn;
   int inputs[][2] = {
-    {0, 0},
-    {1, 0},
-    {0, 1},
-    {1, 1}
+    {1, 1},
+    {0, 0}
   };
-  int targets[][1] = {
-    {0},
-    {1},
-    {1},
-    {0}
+  int targets[][2] = {
+    {1, 0},
+    {0, 1}
   };
 
-  if (nn_init(&nn, 2, 2, 1)) {
+  if (nn_init(&nn, 2, 2, 2)) {
     fprintf(stderr, "The NN library could not be initialized\n");
   }
 
-  nn_train(&nn, 4, inputs, targets);
-  nn_test(&nn, 4, inputs, targets);
+  nn_train(&nn, 2, inputs, targets);
+  nn_test(&nn, 2, inputs, targets);
   nn_del(&nn);
 
   return 0;
