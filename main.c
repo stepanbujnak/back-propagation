@@ -15,29 +15,29 @@
  * Notes     : Developed for C99 standard of C Programming Language
  ******************************************************************************/
 
-#include "nn.h"
-
 #include <stdio.h>
+
+#include "nn.h"
 
 int
 main(int argc, char *argv[]) {
-  struct nn nn;
-  int inputs[][2] = {
-    {1, 1},
-    {0, 0}
-  };
-  int targets[][2] = {
-    {1, 0},
-    {0, 1}
-  };
+    struct nn nn;
+    int inputs[][2] = {
+        {1, 1},
+        {0, 0}
+    };
+    int targets[][2] = {
+        {1, 0},
+        {0, 1}
+    };
 
-  if (nn_init(&nn, 2, 2, 2)) {
-    fprintf(stderr, "The NN library could not be initialized\n");
-  }
+    if (nn_init(&nn, 2, 2, 2)) {
+        fprintf(stderr, "The NN library could not be initialized\n");
+    }
 
-  nn_train(&nn, 2, inputs, targets);
-  nn_test(&nn, 2, inputs, targets);
-  nn_del(&nn);
+    nn_train(&nn, 2, inputs, targets);
+    nn_test(&nn, 2, inputs, targets);
+    nn_del(&nn);
 
-  return 0;
+    return 0;
 }

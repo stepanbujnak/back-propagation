@@ -24,27 +24,27 @@
 #define NN_MOMENTUM 0.1
 
 struct nn {
-  /* Number of input, hidden and output nodes */
-  int ni;
-  int nh;
-  int no;
+    /* Number of input, hidden and output nodes */
+    int ni;
+    int nh;
+    int no;
 
-  /* Activations for nodes */
-  double *ai;
-  double *ah;
-  double *ao;
+    /* Activations for nodes */
+    double *ai;
+    double *ah;
+    double *ao;
 
-  /* Weight matrices */
-  double **wh;
-  double **wo;
+    /* Weight matrices */
+    double **wh;
+    double **wo;
 
-  /* Last changes */
-  double **ch;
-  double **co;
+    /* Last changes */
+    double **ch;
+    double **co;
 
-  /* Deltas */
-  double *hd; /* Hidden deltas */
-  double *od; /* Output deltas */
+    /* Deltas */
+    double *hd; /* Hidden deltas */
+    double *od; /* Output deltas */
 };
 
 int nn_init(struct nn *, int, int, int);
